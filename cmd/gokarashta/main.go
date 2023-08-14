@@ -24,16 +24,24 @@ var (
 	ldapServer   = os.Getenv("LDAP_SERVER")
 	ldapPort     = os.Getenv("LDAP_PORT")
 	ldapBaseDN   = os.Getenv("LDAP_BASE_USER_DN")
-	vultrAPIKey  = os.Getenv("VULTR_API_KEY")
+	apiKey  = os.Getenv("VULTR_API_KEY")
 	bucketName   = "ewnix-avatars"
 	avatarSuffix = "avatar.png"
 	s3Vultr *s3.S3
+	vc *govultr.Client
+	ctx = context.Background()
 )
 
 type UserRequest struct {
 	Username    string `json:"username"`
 	Password    string `json:"password"`
 	Base64Image string `json:"image"`
+}
+
+func init() {
+    config := &oauth2.Config{}
+    ts := config.TokenSource(ctx, &oauth2.Token{AccessToken: apiKey})
+    vc = govultr.NewClient(oauth2.NewClient(ctx, ts))
 }
 
 func convertToPNG(imageData []byte) ([]byte, error) {
@@ -61,9 +69,6 @@ func convertToPNG(imageData []byte) ([]byte, error) {
 }
 
 func uploadImageToStorage(username string, imageData []byte) error {
-	config := &oauth2.Config{}
-	ts := config.TokenSource(context.Background(), &oauth2.Token{AccessToken: vultrAPIKey})
-	vc := govultr.NewClient(oauth2.NewClient(context.Background(), ts))
 
 	objectKey := username + "/" + avatarSuffix
 
