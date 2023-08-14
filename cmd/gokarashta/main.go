@@ -5,15 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"image"
-	"image/jpeg"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"context"
 	"os/exec"
 
-	"github.com/nfnt/resize"
 	"github.com/vultr/govultr/v2"
 	"golang.org/x/oauth2"
 	"github.com/go-ldap/ldap/v3"
@@ -62,38 +59,6 @@ func authenticateLDAP(username, password string) bool {
 	return err == nil
 }
 
-func resizeImage(encodedImage string) ([]byte, string, error) {
-	decoded, err := base64.StdEncoding.DecodeString(encodedImage)
-	if err != nil {
-		return nil, "", fmt.Errorf("Error decoding base64 image: %v", err)
-	}
-
-	img, format, err := image.Decode(bytes.NewReader(decoded))
-	if err != nil {
-		return nil, "", fmt.Errorf("Error decoding image: %v", err)
-	}
-
-	resized := resize.Resize(100, 0, img, resize.Lanczos3)
-	buf := new(bytes.Buffer)
-
-	if format == "jpeg" || format == "jpg" {
-		// Convert JPEG to PNG using the convertToPNG function
-		pngData, err := convertToPNG(decoded)
-		if err != nil {
-			return nil, "", fmt.Errorf("Error converting image to PNG: %v", err)
-		}
-		return pngData, "png", nil
-	}
-
-	// Encode the resized image
-	err = jpeg.Encode(buf, resized, nil)
-	if err != nil {
-		return nil, "", fmt.Errorf("Error encoding resized image: %v", err)
-	}
-
-	return buf.Bytes(), "png", nil
-}
-
 
 func convertToPNG(jpegData []byte) ([]byte, error) {
 	cmd := exec.Command("convert", "-", "-format", "png", "-")
@@ -139,33 +104,35 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resize the image
-	resizedImageData, format, err := resizeImage(requestData.Image)
+	// Decode the base64 image
+	decodedImage, err := base64.StdEncoding.DecodeString(requestData.Image)
 	if err != nil {
-		http.Error(w, "Image processing failed", http.StatusInternalServerError)
+		http.Error(w, "Error decoding image", http.StatusInternalServerError)
 		return
 	}
 
-	// Convert to PNG if not already in PNG format
-	var pngData []byte
-	if format != "png" {
-		pngData, err = convertToPNG(resizedImageData)
+	// Convert JPEG to PNG if necessary
+	imageFormat := http.DetectContentType(decodedImage)
+	var finalImageData []byte
+	if imageFormat == "image/jpeg" || imageFormat == "image/jpg" {
+		pngData, err := convertToPNG(decodedImage)
 		if err != nil {
-			http.Error(w, "Failed to convert image to PNG", http.StatusInternalServerError)
+			http.Error(w, "Error converting image to PNG", http.StatusInternalServerError)
 			return
 		}
+		finalImageData = pngData
 	} else {
-		pngData = resizedImageData
+		finalImageData = decodedImage
 	}
 
-	// Upload the PNG image
-	err = uploadObject(pngData, requestData.Username)
+	// Upload the final image data
+	err = uploadObject(finalImageData, requestData.Username)
 	if err != nil {
 		http.Error(w, "Failed to upload image", http.StatusInternalServerError)
 		return
 	}
 
-	w.Write([]byte("Processed"))
+	w.Write([]byte("Avatar uploaded!"))
 }
 
 
