@@ -124,17 +124,23 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resize the image
-	resizedImageData, err := resizeImage(requestData.Image)
+	resizedImageData, format, err := resizeImage(requestData.Image)
 	if err != nil {
 		http.Error(w, "Image processing failed", http.StatusInternalServerError)
 		return
 	}
 
-	// Convert resized image to PNG using ImageMagick
-	pngData, err := convertToPNG(resizedImageData)
-	if err != nil {
-		http.Error(w, "Failed to convert image to PNG", http.StatusInternalServerError)
-		return
+	var pngData []byte
+
+	// Convert to PNG if not already in PNG format
+	if format != "png" {
+		pngData, err = convertToPNG(resizedImageData)
+		if err != nil {
+			http.Error(w, "Failed to convert image to PNG", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		pngData = resizedImageData
 	}
 
 	// Upload the PNG image
@@ -146,6 +152,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte("Processed"))
 }
+
 
 func main() {
 	r := mux.NewRouter()
