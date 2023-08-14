@@ -64,17 +64,17 @@ func authenticateLDAP(username, password string) bool {
 func resizeImage(encodedImage string) ([]byte, error) {
 	decoded, err := base64.StdEncoding.DecodeString(encodedImage)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error decoding base64 image: %v", err)
 	}
 	img, err := jpeg.Decode(bytes.NewReader(decoded))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error decoding JPEG image: %v", err)
 	}
 	resized := resize.Resize(100, 0, img, resize.Lanczos3)
 	buf := new(bytes.Buffer)
 	err = jpeg.Encode(buf, resized, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error encoding resized image: %v", err)
 	}
 	return buf.Bytes(), nil
 }
@@ -85,7 +85,7 @@ func convertToPNG(jpegData []byte) ([]byte, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error converting JPEG to PNG: %v", err)
 	}
 	return out.Bytes(), nil
 }
