@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
 	"image/jpeg"
 	"io/ioutil"
 	"net/http"
@@ -61,23 +62,38 @@ func authenticateLDAP(username, password string) bool {
 	return err == nil
 }
 
-func resizeImage(encodedImage string) ([]byte, error) {
+func resizeImage(encodedImage string) ([]byte, string, error) {
 	decoded, err := base64.StdEncoding.DecodeString(encodedImage)
 	if err != nil {
-		return nil, fmt.Errorf("Error decoding base64 image: %v", err)
+		return nil, "", fmt.Errorf("Error decoding base64 image: %v", err)
 	}
-	img, err := jpeg.Decode(bytes.NewReader(decoded))
+
+	img, format, err := image.Decode(bytes.NewReader(decoded))
 	if err != nil {
-		return nil, fmt.Errorf("Error decoding JPEG image: %v", err)
+		return nil, "", fmt.Errorf("Error decoding image: %v", err)
 	}
+
 	resized := resize.Resize(100, 0, img, resize.Lanczos3)
 	buf := new(bytes.Buffer)
+
+	if format == "jpeg" || format == "jpg" {
+		// Convert JPEG to PNG using the convertToPNG function
+		pngData, err := convertToPNG(decoded)
+		if err != nil {
+			return nil, "", fmt.Errorf("Error converting image to PNG: %v", err)
+		}
+		return pngData, "png", nil
+	}
+
+	// Encode the resized image
 	err = jpeg.Encode(buf, resized, nil)
 	if err != nil {
-		return nil, fmt.Errorf("Error encoding resized image: %v", err)
+		return nil, "", fmt.Errorf("Error encoding resized image: %v", err)
 	}
-	return buf.Bytes(), nil
+
+	return buf.Bytes(), "png", nil
 }
+
 
 func convertToPNG(jpegData []byte) ([]byte, error) {
 	cmd := exec.Command("convert", "-", "-format", "png", "-")
@@ -130,9 +146,8 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var pngData []byte
-
 	// Convert to PNG if not already in PNG format
+	var pngData []byte
 	if format != "png" {
 		pngData, err = convertToPNG(resizedImageData)
 		if err != nil {
