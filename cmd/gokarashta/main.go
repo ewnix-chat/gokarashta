@@ -3,10 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"image/jpeg"
 	"image/png"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -34,7 +34,7 @@ var (
 type UserRequest struct {
 	Username    string
 	Password    string
-	Base64Image string
+	ImageData   []byte
 }
 
 func init() {
@@ -48,7 +48,6 @@ func ToPng(imageBytes []byte) ([]byte, error) {
 
 	switch contentType {
 	case "image/png":
-		// No need to convert, it's already a PNG
 		return imageBytes, nil
 	case "image/jpeg":
 		img, err := jpeg.Decode(bytes.NewReader(imageBytes))
@@ -83,45 +82,68 @@ func uploadImageToStorage(username string, imageData []byte) error {
 }
 
 func handleUpload(w http.ResponseWriter, r *http.Request) {
-	var userReq UserRequest
+	fmt.Println("Client connected:", r.RemoteAddr)
+	fmt.Println("Received POST request to /upload")
 
-	r.ParseMultipartForm(10 << 20)
-	userReq.Username = r.FormValue("username")
-	userReq.Password = r.FormValue("password")
-	userReq.Base64Image = r.FormValue("image")
+	w.Header().Set("Access-Control-Allow-Origin", "https://www.ewnix.net")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "*")
+
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		fmt.Println("Error parsing form:", err.Error())
+		http.Error(w, "Unable to parse form", http.StatusBadRequest)
+		return
+	}
+
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+	imageFile, _, err := r.FormFile("image")
+	if err != nil {
+		fmt.Println("Error retrieving image file:", err.Error())
+		http.Error(w, "Image file not provided", http.StatusBadRequest)
+		return
+	}
+	defer imageFile.Close()
 
 	l, err := ldap.Dial("tcp", fmt.Sprintf("%s:%s", ldapServer, ldapPort))
 	if err != nil {
+		fmt.Println("LDAP connection error:", err.Error())
 		http.Error(w, "LDAP connection error", http.StatusInternalServerError)
 		return
 	}
 	defer l.Close()
 
-	userDN := fmt.Sprintf("cn=%s,%s", userReq.Username, ldapBaseDN)
-	err = l.Bind(userDN, userReq.Password)
+	userDN := fmt.Sprintf("cn=%s,%s", username, ldapBaseDN)
+	err = l.Bind(userDN, password)
 	if err != nil {
+		fmt.Println("LDAP authentication failed:", err.Error())
 		http.Error(w, "LDAP authentication failed", http.StatusUnauthorized)
 		return
 	}
 
-	imageData, err := base64.StdEncoding.DecodeString(userReq.Base64Image)
+	imageData, err := ioutil.ReadAll(imageFile)
 	if err != nil {
-		http.Error(w, "Image decoding failed", http.StatusBadRequest)
+		fmt.Println("Error reading image:", err.Error())
+		http.Error(w, "Image reading failed", http.StatusBadRequest)
 		return
 	}
 
 	pngData, err := ToPng(imageData)
 	if err != nil {
+		fmt.Println("Image conversion failed:", err.Error())
 		http.Error(w, "Image conversion failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	err = uploadImageToStorage(userReq.Username, pngData)
+	err = uploadImageToStorage(username, pngData)
 	if err != nil {
+		fmt.Println("Image upload failed:", err.Error())
 		http.Error(w, "Image upload failed", http.StatusInternalServerError)
 		return
 	}
 
+	fmt.Println("Image uploaded successfully for user:", username)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Image uploaded successfully"))
 }
