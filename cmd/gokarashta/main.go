@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"image"
 	"image/png"
@@ -24,52 +23,42 @@ var (
 	ldapServer   = os.Getenv("LDAP_SERVER")
 	ldapPort     = os.Getenv("LDAP_PORT")
 	ldapBaseDN   = os.Getenv("LDAP_BASE_USER_DN")
-	apiKey  = os.Getenv("VULTR_API_KEY")
+	apiKey       = os.Getenv("VULTR_API_KEY")
 	bucketName   = "ewnix-avatars"
 	avatarSuffix = "avatar.png"
-	s3Vultr *s3.S3
-	vc *govultr.Client
-	ctx = context.Background()
+	s3Vultr      *s3.S3
+	vc           *govultr.Client
+	ctx          = context.Background()
 )
 
 type UserRequest struct {
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	Base64Image string `json:"image"`
+	Username    string
+	Password    string
+	Base64Image string
 }
 
 func init() {
-    config := &oauth2.Config{}
-    ts := config.TokenSource(ctx, &oauth2.Token{AccessToken: apiKey})
-    vc = govultr.NewClient(oauth2.NewClient(ctx, ts))
+	config := &oauth2.Config{}
+	ts := config.TokenSource(ctx, &oauth2.Token{AccessToken: apiKey})
+	vc = govultr.NewClient(oauth2.NewClient(ctx, ts))
 }
 
 func convertToPNG(imageData []byte) ([]byte, error) {
-	imgFormat := http.DetectContentType(imageData)
-
-	if imgFormat == "image/png" {
-		// Image is already in PNG format, no conversion needed
-		return imageData, nil
-	} else if imgFormat == "image/jpeg" || imgFormat == "image/jpg" {
-		img, _, err := image.Decode(bytes.NewReader(imageData))
-		if err != nil {
-			return nil, fmt.Errorf("JPEG decoding failed: %v", err)
-		}
-
-		var pngBuf bytes.Buffer
-		err = png.Encode(&pngBuf, img)
-		if err != nil {
-			return nil, fmt.Errorf("PNG encoding failed: %v", err)
-		}
-
-		return pngBuf.Bytes(), nil
-	} else {
-		return nil, fmt.Errorf("Unsupported image format: %s", imgFormat)
+	img, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, fmt.Errorf("Image decoding failed: %v", err)
 	}
+
+	var pngBuf bytes.Buffer
+	err = png.Encode(&pngBuf, img)
+	if err != nil {
+		return nil, fmt.Errorf("PNG encoding failed: %v", err)
+	}
+
+	return pngBuf.Bytes(), nil
 }
 
 func uploadImageToStorage(username string, imageData []byte) error {
-
 	objectKey := username + "/" + avatarSuffix
 
 	// Upload the image using s3Vultr.PutObject
@@ -87,15 +76,13 @@ func uploadImageToStorage(username string, imageData []byte) error {
 	return nil
 }
 
-
 func handleUpload(w http.ResponseWriter, r *http.Request) {
 	var userReq UserRequest
 
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&userReq); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
+	r.ParseMultipartForm(10 << 20) // Max 10MB image size
+	userReq.Username = r.FormValue("username")
+	userReq.Password = r.FormValue("password")
+	userReq.Base64Image = r.FormValue("image")
 
 	l, err := ldap.Dial("tcp", fmt.Sprintf("%s:%s", ldapServer, ldapPort))
 	if err != nil {
