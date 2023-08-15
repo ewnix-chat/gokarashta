@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image"
+	"image/png"
 	"log"
 	"net/http"
 	"os"
@@ -16,7 +17,6 @@ import (
 	"github.com/rs/cors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/disintegration/imaging"
 )
 
 var (
@@ -55,13 +55,14 @@ func convertToPNG(imageData []byte) ([]byte, error) {
 
 	// Convert the image to PNG format using the imaging package
 	pngBuf := new(bytes.Buffer)
-	err = imaging.Encode(pngBuf, img, imaging.PNG)
+	err = png.Encode(pngBuf, img)
 	if err != nil {
 		return nil, fmt.Errorf("PNG encoding failed: %v", err)
 	}
 
 	return pngBuf.Bytes(), nil
 }
+
 
 func uploadImageToStorage(username string, imageData []byte) error {
 	objectKey := username + "/" + avatarSuffix
