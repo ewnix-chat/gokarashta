@@ -72,18 +72,33 @@ func ToPng(imageBytes []byte) ([]byte, error) {
 }
 
 func uploadImageToStorage(username string, imageData []byte) error {
-	objectKey := username + "/" + avatarSuffix
+    objectKey := username + "/" + avatarSuffix
 
-	_, err := s3Vultr.PutObject(&s3.PutObjectInput{
-		Body:   bytes.NewReader(imageData),
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(objectKey),
-	})
-	if err != nil {
-		return fmt.Errorf("Image upload failed: %v", err)
-	}
+    // Configure AWS session with logging
+    awsSession := session.Must(session.NewSession(&aws.Config{
+        Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
+        Region:      aws.String("sjc1"),
+	Endpoint:    aws.String("https://sjc1.vultrobjects.com/"),
+        LogLevel:    aws.LogLevel(aws.LogDebugWithHTTPBody),
+        Logger:      aws.LoggerFunc(func(args ...interface{}) {
+            fmt.Println(args...)
+        }),
+    }))
+    // Create S3 service client
+    s3Vultr := s3.New(awsSession)
 
-	return nil
+    _, err := s3Vultr.PutObject(&s3.PutObjectInput{
+        Body:   bytes.NewReader(imageData),
+        Bucket: aws.String(bucketName),
+        Key:    aws.String(objectKey),
+	ACL:    aws.String("public-read"),
+	ContentType: aws.String("image"),
+    })
+    if err != nil {
+        return fmt.Errorf("Image upload failed: %v", err)
+    }
+
+    return nil
 }
 
 func handleUpload(w http.ResponseWriter, r *http.Request) {

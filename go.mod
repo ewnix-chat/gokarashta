@@ -6,6 +6,7 @@ require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
 	github.com/aws/aws-sdk-go v1.44.323 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.4 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.5 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
