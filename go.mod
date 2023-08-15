@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
 	github.com/aws/aws-sdk-go v1.44.323 // indirect
+	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.4 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.5 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
@@ -15,6 +16,7 @@ require (
 	github.com/rs/cors v1.9.0 // indirect
 	github.com/vultr/govultr/v2 v2.17.2 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
+	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

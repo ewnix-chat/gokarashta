@@ -17,6 +17,7 @@ import (
 	"github.com/rs/cors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/disintegration/imaging"
 )
 
 var (
@@ -44,18 +45,20 @@ func init() {
 }
 
 func convertToPNG(imageData []byte) ([]byte, error) {
-	img, _, err := image.Decode(bytes.NewReader(imageData))
-	if err != nil {
-		return nil, fmt.Errorf("Image decoding failed: %v", err)
-	}
+    img, _, err := image.Decode(bytes.NewReader(imageData))
+    if err != nil {
+        return nil, fmt.Errorf("Image decoding failed: %v", err)
+    }
 
-	var pngBuf bytes.Buffer
-	err = png.Encode(&pngBuf, img)
-	if err != nil {
-		return nil, fmt.Errorf("PNG encoding failed: %v", err)
-	}
+    // Convert the image to PNG format using the imaging package
+    pngImg := imaging.Encode(img, imaging.PNG)
+    var pngBuf bytes.Buffer
+    err = png.Encode(&pngBuf, pngImg)
+    if err != nil {
+        return nil, fmt.Errorf("PNG encoding failed: %v", err)
+    }
 
-	return pngBuf.Bytes(), nil
+    return pngBuf.Bytes(), nil
 }
 
 func uploadImageToStorage(username string, imageData []byte) error {
