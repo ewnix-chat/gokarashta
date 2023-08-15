@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/vultr/govultr/v2"
@@ -155,8 +156,10 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Image conversion failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	
+	usernameLower := strings.ToLower(username)
 
-	err = uploadImageToStorage(username, pngData)
+	err = uploadImageToStorage(usernameLower, pngData)
 	if err != nil {
 		fmt.Println("Image upload failed:", err.Error())
 		http.Error(w, "Image upload failed", http.StatusInternalServerError)
