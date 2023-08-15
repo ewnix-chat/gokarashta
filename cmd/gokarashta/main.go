@@ -13,10 +13,11 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/vultr/govultr/v2"
-	"golang.org/x/oauth2"
 	"github.com/rs/cors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 var (
@@ -29,6 +30,8 @@ var (
 	s3Vultr      *s3.S3
 	vc           *govultr.Client
 	ctx          = context.Background()
+	accessKey    = os.Getenv("VULTR_ACCESS_KEY")
+	secretKey    = os.Getenv("VULTR_SECRET_KEY")
 )
 
 type UserRequest struct {
@@ -38,9 +41,11 @@ type UserRequest struct {
 }
 
 func init() {
-	config := &oauth2.Config{}
-	ts := config.TokenSource(ctx, &oauth2.Token{AccessToken: apiKey})
-	vc = govultr.NewClient(oauth2.NewClient(ctx, ts))
+    s3Vultr = s3.New(session.Must(session.NewSession(&aws.Config{
+        Region:      aws.String("sjc1"),
+        Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
+        Endpoint:    aws.String("https://sjc1.vultrobjects.com/"),
+    })))
 }
 
 func ToPng(imageBytes []byte) ([]byte, error) {
