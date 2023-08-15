@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image"
-	"image/png"
 	"log"
 	"net/http"
 	"os"
@@ -45,20 +44,23 @@ func init() {
 }
 
 func convertToPNG(imageData []byte) ([]byte, error) {
-    img, _, err := image.Decode(bytes.NewReader(imageData))
-    if err != nil {
-        return nil, fmt.Errorf("Image decoding failed: %v", err)
-    }
+	img, format, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, fmt.Errorf("Image decoding failed: %v", err)
+	}
 
-    // Convert the image to PNG format using the imaging package
-    pngImg := imaging.Encode(img, imaging.PNG)
-    var pngBuf bytes.Buffer
-    err = png.Encode(&pngBuf, pngImg)
-    if err != nil {
-        return nil, fmt.Errorf("PNG encoding failed: %v", err)
-    }
+	if format == "png" {
+		return imageData, nil // No need to convert, already PNG
+	}
 
-    return pngBuf.Bytes(), nil
+	// Convert the image to PNG format using the imaging package
+	pngBuf := new(bytes.Buffer)
+	err = imaging.Encode(pngBuf, img, imaging.PNG)
+	if err != nil {
+		return nil, fmt.Errorf("PNG encoding failed: %v", err)
+	}
+
+	return pngBuf.Bytes(), nil
 }
 
 func uploadImageToStorage(username string, imageData []byte) error {
@@ -69,7 +71,7 @@ func uploadImageToStorage(username string, imageData []byte) error {
 		Body:   bytes.NewReader(imageData),
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(objectKey),
-		// Set any other required parameters (ACL, ContentType, etc.)
+		ContentType: aws.String("image/png"),  // Add this line
 	})
 	if err != nil {
 		return fmt.Errorf("Image upload failed: %v", err)

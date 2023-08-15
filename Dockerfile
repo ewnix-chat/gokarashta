@@ -16,7 +16,7 @@ FROM gcr.io/distroless/static
 COPY --from=build-env /src/output /
 
 USER nobody:nobody
-ENV PORT=80
+ENV PORT=8080
 EXPOSE $PORT
 
 HEALTHCHECK --interval=10s --timeout=1s --start-period=5s --retries=3 CMD [ "/health" ]
