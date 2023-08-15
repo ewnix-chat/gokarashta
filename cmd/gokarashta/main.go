@@ -163,7 +163,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Image uploaded successfully for user:", username)
+	fmt.Println("Avatar uploaded!")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Image uploaded successfully"))
 }
