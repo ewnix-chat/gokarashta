@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"image"
+	"image/jpeg"
 	"image/png"
 	"log"
 	"net/http"
@@ -43,49 +43,49 @@ func init() {
 	vc = govultr.NewClient(oauth2.NewClient(ctx, ts))
 }
 
-func convertToPNG(imageData []byte) ([]byte, error) {
-	img, format, err := image.Decode(bytes.NewReader(imageData))
-	if err != nil {
-		return nil, fmt.Errorf("Image decoding failed: %v", err)
+func ToPng(imageBytes []byte) ([]byte, error) {
+	contentType := http.DetectContentType(imageBytes)
+
+	switch contentType {
+	case "image/png":
+		// No need to convert, it's already a PNG
+		return imageBytes, nil
+	case "image/jpeg":
+		img, err := jpeg.Decode(bytes.NewReader(imageBytes))
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode jpeg: %v", err)
+		}
+
+		buf := new(bytes.Buffer)
+		if err := png.Encode(buf, img); err != nil {
+			return nil, fmt.Errorf("unable to encode png: %v", err)
+		}
+
+		return buf.Bytes(), nil
 	}
 
-	if format == "png" {
-		return imageData, nil // No need to convert, already PNG
-	}
-
-	// Convert the image to PNG format using the imaging package
-	pngBuf := new(bytes.Buffer)
-	err = png.Encode(pngBuf, img)
-	if err != nil {
-		return nil, fmt.Errorf("PNG encoding failed: %v", err)
-	}
-
-	return pngBuf.Bytes(), nil
+	return nil, fmt.Errorf("unable to convert %#v to png", contentType)
 }
-
 
 func uploadImageToStorage(username string, imageData []byte) error {
 	objectKey := username + "/" + avatarSuffix
 
-	// Upload the image using s3Vultr.PutObject
 	_, err := s3Vultr.PutObject(&s3.PutObjectInput{
 		Body:   bytes.NewReader(imageData),
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(objectKey),
-		ContentType: aws.String("image/png"),  // Add this line
 	})
 	if err != nil {
 		return fmt.Errorf("Image upload failed: %v", err)
 	}
 
-	log.Printf("Image for user %q uploaded successfully!", username)
 	return nil
 }
 
 func handleUpload(w http.ResponseWriter, r *http.Request) {
 	var userReq UserRequest
 
-	r.ParseMultipartForm(10 << 20) // Max 10MB image size
+	r.ParseMultipartForm(10 << 20)
 	userReq.Username = r.FormValue("username")
 	userReq.Password = r.FormValue("password")
 	userReq.Base64Image = r.FormValue("image")
@@ -110,9 +110,9 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pngData, err := convertToPNG(imageData)
+	pngData, err := ToPng(imageData)
 	if err != nil {
-		http.Error(w, "Image conversion failed", http.StatusInternalServerError)
+		http.Error(w, "Image conversion failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -127,18 +127,15 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Set up CORS middleware
 	corsOptions := cors.New(cors.Options{
 		AllowedOrigins: []string{"https://www.ewnix.net"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders: []string{"*"},
 	})
 
-	// Create a mux with CORS middleware
 	mux := http.NewServeMux()
 	mux.HandleFunc("/upload", handleUpload)
 
-	// Use CORS middleware with your handler
 	handler := corsOptions.Handler(mux)
 
 	log.Fatal(http.ListenAndServe(":8080", handler))
